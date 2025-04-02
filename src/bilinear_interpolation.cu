@@ -57,8 +57,8 @@ __global__ void interpolate_kernel(
         // Get the nearest integer coordinates in the original image
         int y0 = floor(y);
         int x0 = floor(x);
-        int y1 = ceil(y);
-        int x1 = ceil(x);
+        int y1 = ceil(y) < height ? ceil(y) : y0;   // Ensure bounds
+        int x1 = ceil(x) < width ? ceil(x) : x0;    // Ensure bounds
 
         // Get the distance between the scaled output coordinates and the nearest integer coordinates
         float dy = y - y0;
