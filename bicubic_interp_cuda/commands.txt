@@ -1,0 +1,5 @@
+nvcc bicubic_interp.cu lodepng.cpp -o bicubic_interp
+gcc test_equality.c lodepng.c -o equality
+
+./bicubic_interp Inputs/landscape.png Outputs/landscape.png 100
+./equality Outputs/landscape.png Reference/landscape.png
