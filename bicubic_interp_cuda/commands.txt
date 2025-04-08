@@ -1,5 +1,13 @@
-nvcc bicubic_interp.cu lodepng.cpp -o bicubic_interp
-gcc test_equality.c lodepng.c -o equality
+gcc sequential_bicubic.c lodepng.c -o bicubic_sequential
+./bicubic_sequential Inputs/landscape.png Outputs/seq_1k.png
+./equality Reference/1K.png Outputs/seq_1k.png
+./bicubic_sequential Inputs/4KDown.png Outputs/seq_4k.png
+./equality Reference/4K.png Outputs/seq_4k.png
 
-./bicubic_interp Inputs/landscape.png Outputs/landscape.png 100
-./equality Outputs/landscape.png Reference/landscape.png
+
+nvcc bicubic_interp.cu lodepng.cpp -o bic_upscale
+./bic_upscale Inputs/landscape.png Outputs/cuda_1k.png 256 6000
+./equality Reference/1k.png Outputs/cuda_1k.png
+./bic_upscale Inputs/4KDown.png Outputs/cuda_4k.png 256 16200
+./equality Reference/4K.png Outputs/cuda_4k.png
+

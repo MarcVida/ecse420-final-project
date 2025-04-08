@@ -6,12 +6,14 @@
 #include <stdio.h>
 
 
-cudaError_t bicubicInterpCuda(unsigned char* input, unsigned char* output, int inputWidth, int inputHeight, int numThreads);
+cudaError_t bicubicInterpCuda(unsigned char* input, unsigned char* output, int inputWidth, int inputHeight, int numThreads, int numBlocks);
 
 __global__ void upscale(unsigned char* input, unsigned char* output, int numPixelsPerThread, int inputWidth, int inputHeight){
     int threadId = blockIdx.x * blockDim.x + threadIdx.x;
     int startingPixel = threadId * numPixelsPerThread;
-    
+    if(startingPixel >= inputHeight*inputWidth*4){
+        return;
+    }
     for(int currPixel = startingPixel; currPixel < startingPixel + numPixelsPerThread; currPixel++){
         int x = currPixel % (inputWidth * 2);
         int y = currPixel / (inputWidth * 2);
@@ -23,7 +25,7 @@ __global__ void upscale(unsigned char* input, unsigned char* output, int numPixe
             output[currPixel*4+3] = 255;
         }else{
             // Handle edge cases where 4x4 kernel wont fit
-            if(x < 3 || y < 3 || x > (inputWidth*2 - 3) || y > (inputHeight*2 - 3)){
+            if(1==2&&(x < 3 || y < 3 || x > (inputWidth*2 - 3) || y > (inputHeight*2 - 3))){
                 // (temp) take a pixel value from original
                 for(int c=0; c<4; c++){
                     output[4*currPixel+c] = input[4*(x/2+y/2*inputWidth)+c];
@@ -41,12 +43,24 @@ __global__ void upscale(unsigned char* input, unsigned char* output, int numPixe
                 float y_weight = 0.0f;
                 
                 float r = 0, g=0, b=0, total_weight=0;
-                for(int i = -1; i < 3; i++){
-                    for(int j = -1; j < 3; j++){
+                for(int i = -1; i < 2; i++){
+                    for(int j = -1; j < 2; j++){
                         int px = floor(input_x) + i;
                         int py = floor(input_y) + j;
-                        x_dist = abs(px - input_x);
-                        y_dist = abs(py - input_y);
+
+                        if(px < 0){
+                            px=0;
+                        }else if(px >= inputWidth){
+                            px = inputWidth-1;
+                        }
+                        if(py < 0){
+                            py=0;
+                        }else if(py >= inputHeight){
+                            py = inputHeight-1;
+                        }
+
+                        x_dist = fabs(px - input_x);
+                        y_dist = fabs(py - input_y);
                         if(x_dist < 1.0f){
                             x_weight = (a_param + 2)*pow(x_dist,3) - (a_param + 3)*pow(x_dist, 2) + 1;
                         }else if(x_dist < 2.0f){
@@ -65,11 +79,12 @@ __global__ void upscale(unsigned char* input, unsigned char* output, int numPixe
                         r += input[4*(px + py*inputWidth)]* x_weight * y_weight;
                         g += input[4*(px + py*inputWidth)+1]* x_weight * y_weight;
                         b += input[4*(px + py*inputWidth)+2]* x_weight * y_weight;
+                        total_weight += x_weight*y_weight;
                     }
                 }
-                output[4*currPixel] = r;
-                output[4*currPixel + 1] = g;
-                output[4*currPixel + 2] = b;
+                output[4*currPixel] = r/total_weight;
+                output[4*currPixel + 1] = g/total_weight;
+                output[4*currPixel + 2] = b/total_weight;
                 output[4*currPixel + 3] = 255;
 
             }
@@ -80,12 +95,13 @@ __global__ void upscale(unsigned char* input, unsigned char* output, int numPixe
 
 int main(int argc, char* argv[])
 {
-    if (argc != 4) {
-        printf("Proper usage: ./bicubic_cuda <name of input png> <name of output png> <# threads>");
+    if (argc != 5) {
+        printf("Proper usage: ./bicubic_cuda <name of input png> <name of output png> <# threads/block> <# blocks>");
         return 1;
     }
     const int NUM_THREADS = atoi(argv[3]);
-    if (NUM_THREADS == 0) {
+    const int NUM_BLOCKS = atoi(argv[4]);
+    if (NUM_THREADS == 0 || NUM_BLOCKS == 0) {
         printf("# threads must be valid non-zero integer");
         return 1;
     }
@@ -105,7 +121,7 @@ int main(int argc, char* argv[])
     }
 
     // Prep and perform cuda function
-    cudaError_t cudaStatus = bicubicInterpCuda(image, new_image, inputWidth, inputHeight, NUM_THREADS);
+    cudaError_t cudaStatus = bicubicInterpCuda(image, new_image, inputWidth, inputHeight, NUM_THREADS, NUM_BLOCKS);
     if (cudaStatus != cudaSuccess) {
         fprintf(stderr, "addWithCuda failed!");
         return 1;
@@ -128,19 +144,20 @@ int main(int argc, char* argv[])
 
     return 0;
 }
-cudaError_t bicubicInterpCuda(unsigned char* input, unsigned char* output, int inputWidth, int inputHeight, int numThreads){
+cudaError_t bicubicInterpCuda(unsigned char* input, unsigned char* output, int inputWidth, int inputHeight, int numThreads, int numBlocks){
     cudaError_t cudaStatus;
     unsigned char* dev_input = 0;
     unsigned char* dev_output = 0;
     GpuTimer timer;
 
 
-    printf("%d, %d, %d\n", inputWidth, inputHeight, numThreads);
-
-    int numBlocks = ceil(((float)numThreads)/1024); 
-    int numPixelsPerThread = ceil((inputWidth*2)*(inputHeight*2)/((float)numThreads));
-    int numActualThreads = numThreads % 32;
-
+    
+    
+    //int numBlocks = ceil(((float)numThreads)/32); 
+    
+    int numPixelsPerThread = ceil((inputWidth*2)*(inputHeight*2)/((float)numBlocks*(float)numThreads));
+    printf("Width/Height/Numthreads: %d/%d/%d\n", inputWidth, inputHeight, numThreads);
+    printf("# Threads per Block: %d, #Blocks: %d, #Threads total: %d\n",numThreads, numBlocks, numThreads*numBlocks);
     printf("Num blocks %d, num pixels per thread %d\n", numBlocks, numPixelsPerThread);
 
     cudaStatus = cudaSetDevice(0);
