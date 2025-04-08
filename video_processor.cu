@@ -51,18 +51,14 @@ int file_exists(const char* filename) {
 
 int main(int argc, char* argv[])
 {
-    if(argc < 4) {
-        printf("Usage: %s input_video output_video scale_factor\n", argv[0]);
+    if(argc < 3) {
+        printf("Usage: %s input_video output_video\n", argv[0]);
         return 1;
     }
     
     const char* input_video = argv[1];
     const char* output_video = argv[2];
-    float scale = atof(argv[3]);
-    if(scale <= 0) {
-        fprintf(stderr, "Scale factor must be positive.\n");
-        return 1;
-    }
+
     
     const char* extract_dir = "extracted_frames";
     const char* upscale_dir = "upscaled_frames";
@@ -106,7 +102,7 @@ int main(int argc, char* argv[])
             break;
         }
         
-        upscaled = bicubic_interpolate(image, width, height, scale, &new_width, &new_height);
+        upscaled = bicubic_interpolate(image, width, height,&new_width, &new_height);
         if(!upscaled) {
             fprintf(stderr, "Error upscaling frame %s\n", in_frame);
             free(image);

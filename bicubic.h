@@ -8,7 +8,6 @@ extern "C" {
 unsigned char* bicubic_interpolate(const unsigned char* input,
                                    unsigned in_width,
                                    unsigned in_height,
-                                   float scale,
                                    unsigned *out_width,
                                    unsigned *out_height);
 
