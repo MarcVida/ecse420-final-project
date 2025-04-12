@@ -43,8 +43,8 @@ __global__ void upscale(unsigned char* input, unsigned char* output, int numPixe
                 float y_weight = 0.0f;
                 
                 float r = 0, g=0, b=0, total_weight=0;
-                for(int i = -1; i < 2; i++){
-                    for(int j = -1; j < 2; j++){
+                for(int i = -1; i < 3; i++){
+                    for(int j = -1; j < 3; j++){
                         int px = floor(input_x) + i;
                         int py = floor(input_y) + j;
 
